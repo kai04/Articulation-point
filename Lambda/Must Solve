@@ -1,0 +1,43 @@
+Convention :  
+• We omit outermost parentheses. For instance, we write MN
+  instead of (MN).
+• Applications associate to the left; thus, MNP means (MN)P. This is
+  convenient when applying a function to a number of arguments, as in fxyz,
+  which means ((fx)y)z.
+• The body of a lambda abstraction (the part after the dot) extends as far
+  to the right as possible. In particular, λx.MN means λx.(MN), and not
+  (λx.M)N.
+• Multiple lambda abstractions can be contracted; thus λxyz.M will abbreviate
+  λx.λy.λz.M.
+
+
+
+
+Exercise 3. (a) Write the following terms with as few parenthesis as possible,
+without changing the meaning or structure of the terms:
+	(i) (λx.(λy.(λz.((xz)(yz))))),
+	(ii) (((ab)(cd))((ef)(gh))),
+	(iii) (λx.((λy.(yx))(λv.v)z)u)(λw.w).
+
+(b) Restore all the dropped parentheses in the following terms, without changing
+the meaning or structure of the terms:
+	(i) xxxx,
+	(ii) λx.xλy.y,
+	(iii) λx.(xλy.yxx)x.
+
+
+
+T = λxy.x
+F = λxy.y
+AND be the term λab.abF
+OR=? 
+NOT=?
+
+if then else = λx.x
+if then else T M N →β  M
+if then else F M N →β  N
+
+
+iszero = λnxy.n(λz.y)x   ---------- Not able to understand
+iszero = \n.n(\z.False)True   ------------Taught in class
+

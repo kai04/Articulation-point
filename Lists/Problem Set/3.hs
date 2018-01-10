@@ -1,0 +1,1 @@
+powers x =  1: x : [x*y | y<-tail (powers x)] --(x,y) <-zip  [1] (tail (powers x))]

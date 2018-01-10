@@ -1,0 +1,12 @@
+About the foldX differences: They all do the exact same thing: reduce a list to a single value. The difference between the functions is merely the internal definition. foldl folds the list from the left, and foldr does it to the right.
+
+So to sum up a list, you can use all of them like this...
+
+foldl1 (+) [1,2,3] == 6
+foldr (+) 0 [1,2,3] == 6
+foldl (+) 0 [1,2,3] == 6
+
+You see, except for foldl1, you supply a function to fold, a starting value (accumulator) and a list to fold. fold1 has it's own accumulator, you don't give it your own.
+
+foldr map :: [a] -> (a->b) -> [b] --- id -> list -> result -- result should be same as id so 
+		  :: [a] -> (a->a) -> [a]

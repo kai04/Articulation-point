@@ -1,0 +1,38 @@
+Synthesis of Functional Programs:
+--------------------------------
+
+1.  John K.  Feser, Swarat  Chaudhuri, Isil  Dillig: Synthesizing
+data structure  transformations from input-output  examples. PLDI
+2015: 229-239
+
+2.   Navid Yaghmazadeh,  Christian Klinger,  Isil Dillig,  Swarat
+Chaudhuri:   Synthesizing   transformations   on   hierarchically
+structured data. PLDI 2016: 508-521
+
+Coq
+---
+
+1. Covering the two chapters:
+
+a. Lists: Working with Structured Data:
+b. Poly: Polymorphism and Higher-Order Functions
+
+2. Covering the chapter: 
+
+ProofObjects:   The   Curry-Howard  Correspondence,   Extraction:
+Extracting ML (still better, Haskell) from Coq.
+
+Concurrency in Haskell
+----------------------
+	
+1. Developing a High-Performance Web Server in Concurrent Haskell- Simon Marlow. Microsoft Research
+2. Lock Free Data Structures using STM in Haskell. Anthony Discolo1, Tim Harris, Simon Marlow2, Simon Peyton Jones,. Satnam Singh. 
+
+
+Monads.
+------
+
+1. Any large real life application of monad. 
+
+2. Monad transformers step by step- Martin Grabmuller
+

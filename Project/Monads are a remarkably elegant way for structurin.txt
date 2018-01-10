@@ -1,0 +1,312 @@
+data Car = Car {company :: String, model :: String, year :: Int} 
+  deriving (Show)  
+ghci>Car {company="Ford", model="Mustang", year=1967}  
+Car {company = "Ford", model = "Mustang", year = 1967}  
+
+ghci>Car "Ford" "Mustang" 1967  
+Car {company = "Ford", model = "Mustang", year = 1967}  
+
+:t company = Car -> String
+
+https://carlo-hamalainen.net/blog/2014/3/5/note-to-self-reader-monad-transformer     
+
+
+
+
+Monads are a remarkably elegant way for structuring programs in a flexible and extensible
+way. They are especially interesting in a lazy functional language like Haskell, because they
+allow the integration of side-effects into otherwise purely functional programs. Furthermore, by
+structuring a program with monads, it is possible to hide much of the necessary book-keeping
+and plumbing necessary for many algorithms in a handful of definitions specific for the monad
+in use, removing the clutter from the main algorithm.
+Monad transformers offer an additional benefit to monadic programming: by providing a
+library of different monads and types and functions for combining these monads, it is possible
+to create custom monads simply by composing the necessary monad transformers. For example,
+if you need a monad with state and error handling, just take the StateT and ErrorT monad
+transformers and combine them. The goal of this paper is to give a gentle introduction to the
+use of monad transformers by starting with a simple function and extending it step by step with
+various monadic operations in order to extend its functionality. This paper is not about the
+theory underlying the monad transformer concept, and not about their implementation (except
+for what is necessary for successfully using them).
+
+
+
+
+The essential difference between the old "Control.Monad.Error" system and the new "Control.Monad.Except" system is that the new system imposes no class restriction on the error/exception type.
+
+
+
+
+
+-------------------------------------------------Functional Dependencies--------------------------------------------------------------------------------------------
+In a class declaration, all of the class type variables must be reachable (in the sense mentioned in Section 7.8.2, “The context of a type signature”) from the free variables of each method type. For example:
+
+  class Coll s a where
+    empty  :: s
+    insert :: s -> a -> s
+is not OK, because the type of empty doesn't mention a. Functional dependencies can make the type variable reachable:
+
+  class Coll s a | s -> a where
+    empty  :: s
+    insert :: s -> a -> s
+Alternatively Coll might be rewritten
+
+  class Coll s a where
+    empty  :: s a
+    insert :: s a -> a -> s a
+which makes the connection between the type of a collection of a's (namely (s a)) and the element type a. Occasionally this really doesn't work, in which case you can split the class like this:
+
+  class CollE s where
+    empty  :: s
+
+  class CollE s => Coll s a where
+    insert :: s -> a -> s
+
+-----------------------Example--------------------------------------------------------------
+
+ module Transformers where 
+import Control.Monad.Identity 
+import Control.Monad.Error 
+import Control.Monad.Reader 
+import Control.Monad.State 
+import Control.Monad.Writer 
+import Data.Maybe 
+import qualiﬁed Data.Map as Map
+
+type Name = String -- variable names 
+data Exp = Lit Integer -- expressions 
+          | Var Name | Plus Exp Exp | Abs Name Exp | App Exp Exp 
+    deriving (Show) 
+data Value = IntVal Integer -- values 
+            | FunVal Env Name Exp 
+  deriving (Show) 
+
+type Env = Map.Map Name Value -- mapping from names to values
+
+eval0 :: Env →Exp →Value 
+eval0 env (Lit i) = IntVal i 
+eval0 env (Var n) = fromJust (Map.lookup n env) 
+eval0 env (Plus e1 e2) = let IntVal i1 = eval0 env e1 
+                             IntVal i2 = eval0 env e2 
+                         in IntVal (i1 +i2) 
+eval0 env (Abs n e) = FunVal env n e 
+eval0 env (App e1 e2) = let val1 = eval0 env e1 
+                            val2 = eval0 env e2 
+                        in case val1 of 
+                          FunVal env0 n body →eval0 (Map.insert n val2 env0) body
+
+ The use of the fromJust5 function is necessary because the Map.lookup function returns a Maybe value. Note that the use of this function introduces an error condition: when a variable is used which is not bound anywhere using a λ expression, the program will halt with an error message
+---------------------------------------------------Identity----------------------------------------------------------------------------------
+we will use Identity monad as a “base case”, around which other monad transformers can be wrapped.
+
+eval1 :: Env → Exp → Identity Value 
+
+eval1 env (Lit i) = return $IntVal i 
+eval1 env (Var n) = return (fromJust (Map.lookup n env))
+eval1 env (Plus e1 e2) = do 
+                            IntVal i1 ←eval1 env e1 
+                            IntVal i2 ←eval1 env e2 
+                            return $IntVal (i1 +i2) 
+eval1 env (Abs n e) = return $FunVal env n e 
+eval1 env (App e1 e2) = do 
+                            val1 ←eval1 env e1 
+                            val2 ←eval1 env e2 
+                            case val1 of 
+                              FunVal env0 n body → eval1 (Map.insert n val2 env0) body 
+
+
+runIdentity (eval1 Map.empty exampleExp)
+
+-------eval1 ::Monad m ⇒Env →Exp →m Value, 
+because we do not use any monadic operations other than return and >>= (hidden in the do notation). This allows the use of eval1 in any monadic context, so that instead of
+runIdentity (eval1 Map.empty exampleExp) we could write
+eval1 Map.empty exampleExp
+
+
+---------------------------------------------------------------------Error Handling-----------------------------------------------
+data Either a b = Left a | Right b deriving (Eq, Ord )
+instance (Error e) => Monad (Either e) where 
+     return = Right 
+     Left l >>= _ = Left l 
+     Right r >>= k = k r 
+     fail msg = Left (strMsg msg)
+
+eval2 :: Env -> Exp -> ErrorT String Identity Value
+eval2 env (Lit i) = return (IntVal i)
+eval2 env (Var n) = case Map.lookup n env of
+                     Nothing -> throwError ("unbound variable: "++n) 
+                     Just val -> return val
+eval2 env (Plus e1 e2) = do e1' <- eval2 env e1
+                            e2' <- eval2 env e2
+                            case (e1',e2') of
+                              (IntVal i1,IntVal i2) -> return (IntVal (i1+i2))
+                              _ -> throwError "type error in addition"
+eval2 env (Abs n e) = return (FunVal env n e)
+eval2 env (App e1 e2) = do val1 <- eval2 env e1
+                           val2 <- eval2 env e2
+                           case val1 of
+                FunVal env' n body -> eval2 (Map.insert n val2 env') body   
+                _ -> throwError "type error in application"        
+
+----    runIdentity (runErrorT (eval2 Map.empty exampleExp))                          => Right (IntVal 18)                 
+----    runIdentity (runErrorT (eval2 Map.empty (Plus (Lit 1) (Abs "x" (Var "x")))))  => Left "type error in addition"
+----    runIdentity (runErrorT (eval2 Map.empty (Var "x")))                           => Left "unbound variable: x"     
+
+---------------------------------------------------------Reader/Writer Monad Classes-------------------------------------------------------
+
+One way to make the deﬁnition of the evaluation function even more pleasing is to hide the environment from all function deﬁnitions and calls. Since there is only one place where the environment is extended (for function application) and two places where it is actually used (for variables and λ expressions), we can reduce the amount of code by hiding it in all other places. This will be done by adding a ReaderT monad transformer in order to implement a reader monad. A reader monad passes a value into a computation and all its sub-computations.
+
+In Haskell the Reader Monad is the standard way to handle functions which need to read some sort of immutable environment.
+
+We start by simply wrapping a ReaderT constructor around our previous monad.
+     ReaderT Env (ErrorT String Identity) Value
+
+---------------------------------------------
+NOTE : Reader and ReaderT Monad definations
+class (Monad m) => MonadReader r m | m -> r where 
+    ask :: m r 
+    local :: (r -> r) -> m a -> m a
+
+newtype Reader r a = Reader { runReader :: r -> a }
+instance Monad (Reader r) where 
+        return a = Reader $ \_ -> a 
+        m >>= k = Reader $ \r -> runReader (k (runReader m r)) r
+instance MonadReader r (Reader r) where 
+        ask = Reader id 
+        local f m = Reader $ runReader m . f
+------------------------------------------------
+
+
+
+
+-------------------------------------------Reader---------------------------------------------------------------------------------------
+   A Reader is a data type that encapsulates an environment. The runReader function takes an environment (a Reader) and runs it, producing the result of type a.
+
+> newtype Reader r a = Reader { runReader :: r -> a }
+Note that with record syntax, the type of runReader is actually
+
+runReader :: Reader r a -> (r -> a)
+Reader that increments its environment value, returning the same type:
+
+> reader1 :: Num r => Reader r r
+> reader1 = Reader $ \r -> r + 1
+Reader that converts its environment value into a string:
+
+> reader2 :: Show r => Reader r String
+> reader2 = Reader $ \r -> "reader2: " ++ (show r)
+“Run” the reader using runReader:
+
+> ghci> runReader reader1 100
+> 101
+> ghci> runReader reader2 100
+> "reader2: 100"
+There’s nothing magic about runReader; it is just taking the function out of the data type. We can do it manually ourselves:
+
+> runReader' :: Reader r a -> (r -> a)
+> runReader' (Reader f) = f
+
+ghci> runReader' reader1 100
+> 101
+Next, make Reader an instance of Monad:
+
+> instance Monad (Reader r) where
+>     return :: a -> Reader r a
+>     return a = Reader $ \_ -> a
+> 
+>     (>>=) :: forall a b. Reader r a -> (a -> Reader r b) -> Reader r b
+>     m >>= k  = Reader $ \r -> runReader (k (runReader m r :: a) :: Reader r b) r
+The definition of >>= is relatively easy to work out using hole driven development.
+
+Example usage:
+
+> eg1 :: Reader Int String
+> eg1 = Reader id >>= \e -> return $ "hey, " ++ show e
+Or in the more readable do notation:
+
+> eg1' :: Reader Int String
+> eg1' = do e <- Reader id
+>           return $ "hey, " ++ show e
+> ghci> runReader eg1' 100
+> "hey, 100"
+----------------------------------------------------------------------------------------------------------------------------------------- 
+
+runReaderT :: ReaderT r m a -> r -> m a   ---------- r:environment,m:monadic value,a:tyoe of result.
+runErrorT  :: ErrorT  e m a -> m (Either e a)
+
+
+runIdentity (runErrorT (runReaderT  (eval3 exampleExp) Map.empty))   -- Call to eval3
+
+
+eval3 :: Exp → ReaderT Env (ErrorT String Identity) Value
+eval3 (Lit i) = return $IntVal i 
+eval3 (Var n) = do env ←ask 
+					case Map.lookup n env of 
+						Nothing →throwError ("unbound variable: "++n) 
+						Just val →return val
+eval3 (Plus e1 e2) = do e1' ← eval3 e1 
+						e2' ← eval3 e2 
+						case (e10,e20) of 
+							(IntVal i1,IntVal i2)→ return $IntVal (i1 +i2) 
+							_→throwError "type error in addition"
+eval3 (Abs n e) = do env ←ask 
+					 return $FunVal env n e 
+eval3 (App e1 e2) = do val1 ←eval3 e1 
+					   val2 ←eval3 e2 
+					   case val1 of 
+					   	FunVal env0 n body →local (const (Map.insert n val2 env0)) (eval3 body) 
+					   	_→throwError "type error in application" 
+
+
+-------------------------------------------------Adding State------------------------------------------------------------------------
+State monad provides operations for specifying an initial state, querying the current state and changing it.
+Suppose if we want to add profiling capabilities to our little interpreter,we can define new monad by wraping StateT constructor monad around the innermost monad,Identity.
+
+Suppose we want ot count number of evaluation steps that is the number of calls to our eval function.
+tick function will take state and increment value by one and will put it back.
+
+[(---newtype StateT s m a   --- type of StateT]
+[---runStateT :: StateT s m a -> s -> m (a, s) ]
+
+tick = do st <- get
+          put (st+1)
+eval4 :: Exp -> ReaderT Env (ErrorT String (StateT Integer Identity)) Value
+eval4 (Lit i) = do tick
+                   return $IntVal i 
+eval4 (Var n) = do 
+                 tick
+                 env <- ask
+                 case Map.lookup n env of 
+            Nothing ->throwError ("unbound variable: "++n) 
+            Just val-> return val
+eval4 (Plus e1 e2) = do 
+                      tick
+                      e1' <- eval4 e1
+                      e2' <- eval4 e2
+                      case (e1',e2') of 
+              (IntVal i1,IntVal i2) -> return $IntVal (i1 +i2) 
+              _->throwError "type error in addition"
+eval4 (Abs n e) = do 
+                   tick
+                   env <- ask 
+                   return $FunVal env n e 
+eval4 (App e1 e2) = do
+                       tick
+                       val1 <- eval4 e1
+                       val2 <- eval4 e2
+                       case val1 of
+                        FunVal env' n body ->local (const (Map.insert n val2 env')) (eval4 body)
+                        _->throwError "type error in application" 
+
+----  runIdentity (runStateT (runErrorT (runReaderT (eval4 exampleExp) Map.empty)) 0)  => (Right (IntVal 18),8)
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+If we swap ErrorT and StateT with each other then result will differ from previous computation.
+First evaluation will be carried out which will generate some value or error.That will be passed to StateT next.
+In case of Normal value it will work the same but if error was generate than state monad will also pass error back.
+Whereas in previous case we were getting tuple - Result and State;Result can be valid value or error-in both cases we were getting state.
+
+The position of the reader monad transformer does not matter, since it does not contribute to the ﬁnal result.
+
+
+---------------------------------------------------------------------------Writer----------------------------------------------------------
+

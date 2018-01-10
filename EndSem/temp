@@ -1,0 +1,70 @@
+wordbuilding dict = [map (:x) (build x (delete dict x)) |x<-dict]
+
+delete (y:ys) y1 | y == y1 = ys
+
+                 | otherwise = y:delete ys y1
+
+
+
+
+
+build x [] = []
+
+build x dict  | (noPlay dict) = [] 
+
+              | otherwise = let l=validWords dict
+
+                    		in  [word:build1 word (delete dict word) (delete dict word)|word<-l]  --
+
+    where noPlay [] = True
+
+          noPlay (xs:xss) | (last x == head xs) = False
+
+                          | otherwise = noPlay xss
+
+          validWords [] = []             
+
+          validWords (y:ys) | (last x == head y) = y:validWords ys
+
+                            | otherwise = validWords ys
+
+
+
+
+
+
+
+build1 x [] _ = []
+
+build1 x _ [] = []
+
+build1 x (y:ys) dict  | (noPlay dict) = [] 
+
+                      | otherwise = if (last x == head y) then ( y:build1 y ys (delete dict y) ) else (build1 x ys dict)
+
+                            		
+
+    where noPlay [] = True
+
+    	  noPlay (xs:xss) | (last x == head xs) = False
+
+                          | otherwise = noPlay xss
+
+          validWords [] = []             
+
+          validWords (y:ys) | (last x == head y) = y:validWords ys
+
+                            | otherwise = validWords ys                            
+
+
+
+--build1 x [] = []	
+
+--build1 x (y:ys) = if (last x == head y) then ( y:build1 y ys (delete dict y) ) else (build x ys dict)
+
+--                  in if (last x == head xs) then (x:xs:xss) else [x]                          
+
+
+
+
+
